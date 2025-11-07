@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.event import Event
+from app.models.venue import Venue
 
 # 🔹 Get all events
 def get_all_events(db: Session):
@@ -25,3 +26,19 @@ def delete_event(db: Session, event_id: int):
         db.commit()
         return True
     return False
+
+def search_events(db, city: str = None, event_type: str = None, status: str = None):
+    """
+    Search and filter events by city, event_type, and/or status.
+    Joins with venues to filter by city.
+    """
+    query = db.query(Event).join(Venue)
+
+    if city:
+        query = query.filter(Venue.city.ilike(f"%{city}%"))
+    if event_type:
+        query = query.filter(Event.event_type.ilike(f"%{event_type}%"))
+    if status:
+        query = query.filter(Event.status == status.upper())
+
+    return query.all()
