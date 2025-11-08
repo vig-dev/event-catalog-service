@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: catalog_db
     ports:
-      - "5432:5432"
+      - "5438:5432"
     volumes:
       - catalog_data:/var/lib/postgresql/data
     networks:
