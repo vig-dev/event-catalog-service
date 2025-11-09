@@ -1,0 +1,91 @@
+# ======================
+# PostgreSQL PVC
+# ======================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-db-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# ======================
+# ConfigMap (non-sensitive)
+# ======================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalog-config
+data:
+  POSTGRES_DB: catalog_db
+  POSTGRES_USER: catalog_user
+  POSTGRES_PASSWORD: password
+---
+# ======================
+# PostgreSQL Deployment
+# ======================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-db
+  template:
+    metadata:
+      labels:
+        app: catalog-db
+    spec:
+      containers:
+        - name: catalog-db
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: catalog-config
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "catalog_user", "-d", "catalog_db"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "catalog_user", "-d", "catalog_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: catalog-db-pvc
+---
+# ======================
+# PostgreSQL Service
+# ======================
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-db
+spec:
+  selector:
+    app: catalog-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  clusterIP: None

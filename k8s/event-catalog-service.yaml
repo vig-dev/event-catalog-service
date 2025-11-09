@@ -1,0 +1,68 @@
+# ======================
+# Catalog App Deployment
+# ======================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-catalog-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-catalog-service
+  template:
+    metadata:
+      labels:
+        app: event-catalog-service
+    spec:
+      containers:
+        - name: event-catalog-service
+          image: event-catalog-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: postgresql://catalog_user:password@catalog-db:5432/catalog_db
+          livenessProbe:
+            httpGet:
+              path: /v1/venues
+              port: 8000
+            initialDelaySeconds: 25
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1/events
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python -m app.db.wait_for_db &&
+              python -m app.db.seed_data &&
+              uvicorn app.main:app --host 0.0.0.0 --port 8000
+---
+# ======================
+# Catalog App Service (NodePort)
+# ======================
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-catalog-service
+spec:
+  selector:
+    app: event-catalog-service
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30081
+  type: NodePort
